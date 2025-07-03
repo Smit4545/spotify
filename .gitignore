@@ -64,8 +64,7 @@ jspm_packages/
 .nuxt
 
 # Gatsby files
-.cache/
-public
+
 
 # Storybook build outputs
 .out
@@ -181,7 +180,7 @@ Thumbs.db
 
 # Uploads directory (for audio files)
 backend/uploads/
-frontend/public/uploads/
+
 
 # MongoDB data
 data/
