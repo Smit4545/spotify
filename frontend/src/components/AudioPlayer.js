@@ -33,23 +33,26 @@ const AudioPlayer = () => {
 
   const [showQueue, setShowQueue] = useState(false);
   const [currentSongId, setCurrentSongId] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
-      console.log("Setting audio element in Redux");
       dispatch(setAudioElement(audioRef.current));
     }
   }, [dispatch]);
 
   useEffect(() => {
     if (currentSong && audioRef.current) {
-      console.log("Setting audio source:", currentSong.filePath);
-      console.log("Current song:", currentSong);
-
-      // Only set new source if it's a different song
       const newSrc = currentSong.filePath;
       if (audioRef.current.src !== newSrc) {
-        console.log("Loading new song, resetting audio");
         audioRef.current.src = newSrc;
         audioRef.current.load();
         setCurrentSongId(currentSong._id);
@@ -57,13 +60,10 @@ const AudioPlayer = () => {
     }
   }, [currentSong]);
 
-  // Separate effect for play state management
   useEffect(() => {
     if (audioRef.current && currentSong) {
       if (isPlaying) {
-        audioRef.current.play().catch((error) => {
-          console.error("Error playing audio:", error);
-        });
+        audioRef.current.play().catch(console.error);
       }
     }
   }, [isPlaying, currentSong]);
@@ -134,7 +134,15 @@ const AudioPlayer = () => {
   };
 
   const handleEnded = () => {
-    dispatch(nextSong());
+    if (repeat === "one") {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+    } else {
+      dispatch(nextSong());
+      dispatch(setIsPlaying(true));
+    }
   };
 
   const handleSeek = (e) => {
@@ -184,6 +192,7 @@ const AudioPlayer = () => {
 
   const handleSkipNext = () => {
     dispatch(nextSong());
+    dispatch(setIsPlaying(true));
   };
 
   const handleSkipPrevious = () => {
@@ -230,242 +239,237 @@ const AudioPlayer = () => {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-spotify-black/95 to-spotify-black-light/95 backdrop-blur-xl border-t border-gray-700/30 p-4 z-50 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-spotify-black/95 to-spotify-black-light/95 backdrop-blur-xl border-t border-gray-700/30 p-2 sm:p-4 z-50 shadow-lg">
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
-        onPlay={() => {
-          console.log("Audio play event fired");
-          dispatch(setIsPlaying(true));
-        }}
-        onPause={() => {
-          console.log("Audio pause event fired");
-          dispatch(setIsPaused(true));
-        }}
-        onError={(e) => {
-          console.error("Audio error:", e);
-          dispatch(setIsPaused(true));
-        }}
+        onPlay={() => dispatch(setIsPlaying(true))}
+        onPause={() => dispatch(setIsPaused(true))}
+        onError={() => dispatch(setIsPaused(true))}
       />
 
-      <div className="container-responsive flex items-center justify-between">
-        {/* Song Info */}
-        <div className="flex items-center space-x-4 flex-1 min-w-0">
-          <div className="w-16 h-16 bg-gradient-spotify rounded-xl flex items-center justify-center shadow-spotify animate-float">
-            <span className="text-2xl font-bold text-white">🎧</span>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
+        {/* Song Info - Always visible */}
+        <div className="flex items-center w-full sm:w-auto sm:flex-1 min-w-0 order-1 sm:order-none">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-spotify rounded-lg sm:rounded-xl flex items-center justify-center shadow-spotify">
+            <span className="text-xl sm:text-2xl">🎧</span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-white font-semibold truncate text-shadow">
+          <div className="ml-2 sm:ml-4 min-w-0 flex-1">
+            <div className="text-white font-semibold truncate text-sm sm:text-base">
               {currentSong.title}
             </div>
-            <div className="text-spotify-gray text-sm truncate">
+            <div className="text-spotify-gray text-xs sm:text-sm truncate">
               {currentSong.artist}
             </div>
           </div>
         </div>
 
-        {/* Player Controls */}
-        <div className="flex flex-col items-center flex-1 max-w-2xl">
-          {/* Control Buttons */}
-          <div className="flex items-center space-x-6 mb-3">
-            <button
-              onClick={handleShuffleToggle}
-              className={`player-control text-2xl transition-all duration-300 hover:scale-110 ${
-                shuffle
-                  ? "text-spotify-green bg-spotify-green/20 border-spotify-green/30"
-                  : "text-spotify-gray hover:text-white"
-              }`}
-            >
-              🔀
-            </button>
-            <button
-              onClick={handleSkipPrevious}
-              className="player-control text-2xl text-spotify-gray hover:text-white transition-all duration-300 hover:scale-110"
-            >
-              ⏮️
-            </button>
-            <button
-              onClick={handlePlayPause}
-              className="player-control-primary text-2xl text-white hover:scale-110 transition-all duration-300 shadow-spotify hover:shadow-spotify-hover"
-            >
-              <span className="text-2xl">{isPlaying ? "⏸️" : "▶️"}</span>
-            </button>
-            <button
-              onClick={handleSkipNext}
-              className="player-control text-2xl text-spotify-gray hover:text-white transition-all duration-300 hover:scale-110"
-            >
-              ⏭️
-            </button>
-            <button
-              onClick={handleRepeatToggle}
-              className={`player-control text-2xl transition-all duration-300 hover:scale-110 ${
-                repeat !== "none"
-                  ? "text-spotify-green bg-spotify-green/20 border-spotify-green/30"
-                  : "text-spotify-gray hover:text-white"
-              }`}
-            >
-              {getRepeatIcon()}
-            </button>
-          </div>
+        {/* Player Controls - Main section */}
+        <div className="w-full sm:flex-1 max-w-2xl order-3 sm:order-none">
+          <div className="flex flex-col items-center">
+            {/* Control Buttons */}
+            <div className="flex items-center justify-center space-x-2 sm:space-x-4 md:space-x-6 mb-1 sm:mb-2">
+              {!isMobile && (
+                <button
+                  onClick={handleShuffleToggle}
+                  className={`text-xl sm:text-2xl transition-all ${
+                    shuffle ? "text-spotify-green" : "text-spotify-gray"
+                  }`}
+                >
+                  🔀
+                </button>
+              )}
+              
+              <button
+                onClick={handleSkipPrevious}
+                className="text-xl sm:text-2xl text-spotify-gray hover:text-white"
+              >
+                ⏮️
+              </button>
+              
+              <button
+                onClick={handlePlayPause}
+                className="mx-2 text-2xl sm:text-3xl text-white bg-spotify-green rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shadow-spotify"
+              >
+                {isPlaying ? "⏸️" : "▶️"}
+              </button>
+              
+              <button
+                onClick={handleSkipNext}
+                className="text-xl sm:text-2xl text-spotify-gray hover:text-white"
+              >
+                ⏭️
+              </button>
+              
+              {!isMobile && (
+                <button
+                  onClick={handleRepeatToggle}
+                  className={`text-xl sm:text-2xl ${
+                    repeat !== "none" ? "text-spotify-green" : "text-spotify-gray"
+                  }`}
+                >
+                  {getRepeatIcon()}
+                </button>
+              )}
+            </div>
 
-          {/* Progress Bar */}
-          <div className="flex items-center space-x-3 w-full">
-            <span className="text-spotify-gray text-xs w-12 text-right font-medium">
-              {formatTime(currentTime)}
-            </span>
-            <div className="flex-1 relative">
-              <div className="progress-bar" onClick={handleSeek}>
+            {/* Progress Bar */}
+            <div className="w-full flex items-center space-x-2 sm:space-x-3">
+              <span className="text-spotify-gray text-xs w-8 sm:w-12 text-right">
+                {formatTime(currentTime)}
+              </span>
+              <div className="flex-1 relative h-2 group">
+                <div 
+                  className="absolute inset-0 bg-gray-700 rounded-full cursor-pointer"
+                  onClick={handleSeek}
+                >
+                  <div
+                    className="absolute left-0 top-0 bottom-0 bg-spotify-green rounded-full"
+                    style={{ width: `${(currentTime / duration) * 100}%` }}
+                  />
+                </div>
                 <div
-                  className="progress-fill"
-                  style={{ width: `${(currentTime / duration) * 100}%` }}
-                />
-                <div
-                  className="progress-handle"
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ left: `${(currentTime / duration) * 100}%` }}
                 />
               </div>
+              <span className="text-spotify-gray text-xs w-8 sm:w-12 text-left">
+                {formatTime(duration)}
+              </span>
             </div>
-            <span className="text-spotify-gray text-xs w-12 text-left font-medium">
-              {formatTime(duration)}
-            </span>
           </div>
         </div>
 
         {/* Right Side Controls */}
-        <div className="flex items-center space-x-4 flex-1 justify-end">
+        <div className="flex items-center justify-end space-x-2 sm:space-x-4 w-full sm:w-auto sm:flex-1 order-2 sm:order-none">
+          {/* Mobile controls */}
+          {isMobile && (
+            <>
+              <button
+                onClick={handleRepeatToggle}
+                className={`text-xl ${
+                  repeat !== "none" ? "text-spotify-green" : "text-spotify-gray"
+                }`}
+              >
+                {getRepeatIcon()}
+              </button>
+              <button
+                onClick={handleShuffleToggle}
+                className={`text-xl ${
+                  shuffle ? "text-spotify-green" : "text-spotify-gray"
+                }`}
+              >
+                🔀
+              </button>
+            </>
+          )}
+
           {/* Queue Button */}
           <button
             onClick={() => setShowQueue(!showQueue)}
-            className="player-control text-xl text-spotify-gray hover:text-white transition-all duration-300 hover:scale-110"
+            className="text-xl text-spotify-gray hover:text-white"
           >
             📋
           </button>
 
           {/* Volume Control */}
-          <div className="relative group">
+          {!isMobile ? (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleVolumeMute}
+                className="text-xl text-spotify-gray hover:text-white"
+              >
+                {volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={handleVolumeChange}
+                className="w-20 sm:w-24 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #1DB954 0%, #1DB954 ${
+                    volume * 100
+                  }%, #4D4D4D ${volume * 100}%, #4D4D4D 100%)`,
+                }}
+              />
+            </div>
+          ) : (
             <button
               onClick={handleVolumeMute}
-              className="player-control text-xl text-spotify-gray hover:text-white transition-all duration-300 hover:scale-110"
+              className="text-xl text-spotify-gray hover:text-white"
             >
-              {volume === 0
-                ? "🔇"
-                : volume < 0.3
-                ? "🔉"
-                : volume < 0.6
-                ? "🔊"
-                : "🔊"}
+              {volume === 0 ? "🔇" : "🔊"}
             </button>
-            <div className="absolute bottom-full right-0 mb-3 card p-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-95 group-hover:scale-100">
-              <div className="flex flex-col items-center space-y-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  className="w-24 h-2 bg-gray-700 rounded-full appearance-none cursor-pointer slider"
-                  style={{
-                    background: `linear-gradient(to right, #1DB954 0%, #1DB954 ${
-                      volume * 100
-                    }%, #4D4D4D ${volume * 100}%, #4D4D4D 100%)`,
-                  }}
-                />
-                <div className="text-center text-white text-xs font-medium">
-                  {Math.round(volume * 100)}%
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleVolumeReset}
-                    className="text-xs bg-spotify-green/20 text-spotify-green px-2 py-1 rounded hover:bg-spotify-green/30 transition-colors"
-                    title="Reset to normal volume"
-                  >
-                    Normal
-                  </button>
-                  <button
-                    onClick={handleVolumeMute}
-                    className="text-xs bg-gray-700/50 text-spotify-gray px-2 py-1 rounded hover:bg-gray-600/50 transition-colors"
-                    title={volume > 0 ? "Mute" : "Unmute"}
-                  >
-                    {volume > 0 ? "Mute" : "Unmute"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Queue Panel */}
       {showQueue && (
-        <div className="absolute bottom-full left-0 right-0 bg-gradient-to-b from-spotify-black/95 to-spotify-black-light/95 backdrop-blur-xl border-t border-gray-700/30 p-6 max-h-80 overflow-y-auto animate-slide-up">
-          <div className="container-responsive">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-white font-bold text-lg gradient-text">
-                Queue
-              </h3>
-              <button
-                onClick={() => setShowQueue(false)}
-                className="text-spotify-gray hover:text-white transition-colors hover-lift"
-              >
-                <span className="text-xl">✕</span>
-              </button>
-            </div>
+        <div className="absolute bottom-full left-0 right-0 bg-gradient-to-b from-spotify-black/95 to-spotify-black-light/95 backdrop-blur-xl border-t border-gray-700/30 p-4 max-h-60 sm:max-h-80 overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-white font-bold text-lg">Queue</h3>
+            <button
+              onClick={() => setShowQueue(false)}
+              className="text-spotify-gray hover:text-white text-xl"
+            >
+              ✕
+            </button>
+          </div>
 
-            {queue.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="text-4xl mb-4 animate-float">🎧</div>
-                <p className="text-spotify-gray">No songs in queue</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {queue.map((song, index) => (
-                  <div
-                    key={`${song._id}-${index}`}
-                    className={`song-card ${
-                      index === currentIndex
-                        ? "bg-gradient-to-r from-spotify-green/20 to-green-400/20 border-spotify-green/30"
-                        : ""
-                    }`}
-                  >
-                    <div className="song-card-overlay"></div>
-                    <div className="relative z-10 flex items-center justify-between">
-                      <div className="flex items-center space-x-4 flex-1 min-w-0">
-                        <div className="w-10 h-10 bg-gradient-spotify rounded-lg flex items-center justify-center shadow-spotify">
-                          <span className="text-white font-bold text-sm">
-                            {index === currentIndex ? "▶️" : index + 1}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-white font-medium truncate">
-                            {song.title}
-                          </div>
-                          <div className="text-spotify-gray text-sm truncate">
-                            {song.artist}
-                          </div>
-                        </div>
+          {queue.length === 0 ? (
+            <div className="text-center py-4">
+              <div className="text-4xl mb-2">🎧</div>
+              <p className="text-spotify-gray">No songs in queue</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {queue.map((song, index) => (
+                <div
+                  key={`${song._id}-${index}`}
+                  className={`flex items-center justify-between p-2 rounded-lg ${
+                    index === currentIndex
+                      ? "bg-gradient-to-r from-spotify-green/20 to-green-400/20"
+                      : "hover:bg-gray-800/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="w-8 h-8 bg-gradient-spotify rounded flex items-center justify-center">
+                      <span className="text-white text-xs">
+                        {index === currentIndex ? "▶️" : index + 1}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-white text-sm font-medium truncate">
+                        {song.title}
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <span className="text-spotify-gray text-sm font-medium">
-                          {song.formattedDuration}
-                        </span>
-                        {index !== currentIndex && (
-                          <button
-                            onClick={() => handleRemoveFromQueue(index)}
-                            className="text-spotify-gray hover:text-red-400 transition-colors hover:scale-110"
-                          >
-                            <span className="text-lg">✕</span>
-                          </button>
-                        )}
+                      <div className="text-spotify-gray text-xs truncate">
+                        {song.artist}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-spotify-gray text-xs">
+                      {song.formattedDuration}
+                    </span>
+                    {index !== currentIndex && (
+                      <button
+                        onClick={() => handleRemoveFromQueue(index)}
+                        className="text-spotify-gray hover:text-red-400 text-lg"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

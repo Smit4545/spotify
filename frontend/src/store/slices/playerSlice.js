@@ -98,14 +98,10 @@ export const playerSlice = createSlice({
       if (state.currentIndex < state.queue.length - 1) {
         state.currentIndex += 1;
         state.currentSong = state.queue[state.currentIndex];
-      } else if (state.repeat === "all") {
-        // Loop back to first song
+      } else {
+        // Always loop back to first song
         state.currentIndex = 0;
         state.currentSong = state.queue[0];
-      } else {
-        // Stop playing
-        state.isPlaying = false;
-        state.isPaused = true;
       }
     },
     previousSong: (state) => {
